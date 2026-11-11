@@ -1,0 +1,58 @@
+[package]
+name        = "ratekeeper"
+version     = "0.4.0"
+edition     = "2021"
+license     = "MIT OR Apache-2.0"
+authors     = ["isaim0011"]
+repository  = "https://github.com/isaim0011/ratekeeper"
+description = "World-class rate limiter: GCRA · Token Bucket · Sliding Window · Redis · Tower · Hierarchical · Adaptive"
+keywords    = ["rate-limiting", "gcra", "tower", "axum", "redis"]
+categories  = ["web-programming", "asynchronous", "network-programming"]
+
+# "rlib" so the crate still works as a normal Rust dependency (that's
+# the common case); "cdylib" so `cargo build --release` also produces
+# a real shared library (ratekeeper.dll / libratekeeper.so /
+# libratekeeper.dylib) for the C FFI and Python bindings to load.
+# Without this, those bindings have nothing to actually link against —
+# a gap that existed before this file added it.
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+default     = ["memory"]
+memory      = ["dep:moka", "dep:dashmap"]
+redis       = ["dep:redis", "dep:deadpool-redis"]
+tower-layer = ["dep:tower", "dep:tower-service", "dep:http", "dep:pin-project-lite"]
+axum        = ["tower-layer", "dep:axum-core"]
+prometheus  = ["dep:prometheus"]
+full        = ["memory", "redis", "tower-layer", "axum", "prometheus"]
+
+[dependencies]
+tokio            = { version = "1",    features = ["time", "sync", "rt", "macros"] }
+async-trait      = "0.1"
+futures-core     = "0.3"
+serde            = { version = "1", features = ["derive"] }
+thiserror        = "2"
+tracing          = "0.1"
+parking_lot      = "0.12"
+
+moka             = { version = "0.12", features = ["future"], optional = true }
+dashmap          = { version = "6",    optional = true }
+redis            = { version = "0.27", features = ["tokio-comp", "script", "connection-manager"], optional = true }
+deadpool-redis   = { version = "0.18", optional = true }
+tower            = { version = "0.5",  features = ["util"], optional = true }
+tower-service    = { version = "0.3",  optional = true }
+http             = { version = "1",    optional = true }
+axum-core        = { version = "0.5",  optional = true }
+pin-project-lite = { version = "0.2",  optional = true }
+prometheus       = { version = "0.13", optional = true }
+
+[dev-dependencies]
+tokio              = { version = "1",   features = ["full", "test-util"] }
+axum               = "0.8"
+criterion          = { version = "0.5", features = ["async_tokio"] }
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+[[bench]]
+name    = "throughput"
+harness = false

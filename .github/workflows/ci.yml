@@ -1,0 +1,65 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+  REDIS_URL: redis://localhost:6379
+
+jobs:
+  test:
+    name: Test (${{ matrix.features }})
+    runs-on: ubuntu-latest
+
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 5
+
+    strategy:
+      matrix:
+        features:
+          - memory
+          - "memory,tower-layer,axum"
+          - "full"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Format check
+        run: cargo fmt --check
+
+      - name: Clippy
+        run: cargo clippy --features ${{ matrix.features }} -- -D warnings
+
+      - name: Unit tests
+        run: cargo test --features ${{ matrix.features }}
+
+      - name: Redis integration tests
+        if: matrix.features == 'full'
+        run: cargo test --features ${{ matrix.features }} -- --include-ignored redis
+
+  bench:
+    name: Benchmarks (smoke)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Run benches (1 sample, smoke only)
+        run: cargo bench --features memory -- --sample-size 10
